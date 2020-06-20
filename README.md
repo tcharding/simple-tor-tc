@@ -1,6 +1,6 @@
 # Simple Tor TC (Tor Controller)
 
-Simple Rust application to demonstrate interfacing with a local Tor instance via the Tor Controller spec
+Simple Rust application to demonstrate interfacing with a local Tor instance via the Tor Controller protocol
 
 ### TODO
 
@@ -13,7 +13,8 @@ Simple Rust application to demonstrate interfacing with a local Tor instance via
    - Test using Tor browser
 
 
-ref:
+### potential libraries to use:
 
-- Rust libtor: [github.com/MagicalBitcoin/libtor](https://github.com/MagicalBitcoin/libtor)
-- C libtor: [github.com/libtor/libtor](https://github.com/libtor/libtor)
+- [tor_client](https://github.com/resolvingarchitecture/tor-client)
+- [torut](https://github.com/teawithsand/torut)
+- [tor_control](https://crates.io/crates/tor_control)
