@@ -4,10 +4,12 @@ Simple Rust application to demonstrate interfacing with a local Tor instance via
 
 ### TODO
 
-1. Act as a client:
+0. Bring up a Tor instance with Control Port configured, connect with `nyx`
+1. Write an application that starts up and connects to the Tor Control Port
+2. Act as a client:
    - Connect to an onion service i.e., do a HTTP request.
 
-2. Act as a server:
+3. Act as a server:
    - Expose a hidden service
    - Start a simple web server
    - Test using Tor browser
