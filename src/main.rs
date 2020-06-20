@@ -1,4 +1,5 @@
-use anyhow::{bail, Result};
+use anyhow::Result;
+use std::net::TcpStream;
 
 // const TC_PORT: u16 = 9051;
 
@@ -14,5 +15,7 @@ fn assert_can_connect_to_tor() -> Result<()> {
     // TODO: Connect using tor-client
     // TODO: Connect using torut
 
-    bail!("failed to connect to local Tor instance")
+    let mut _stream = TcpStream::connect("127.0.0.1:9051")?;
+
+    Ok(())
 }
