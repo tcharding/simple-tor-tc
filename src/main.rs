@@ -1,21 +1,27 @@
-use anyhow::Result;
-use std::net::TcpStream;
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+use anyhow::{bail, Result};
+use tokio::net::TcpStream;
+use torut::control::{UnauthenticatedConn, AuthenticatedConn};
 
-// const TC_PORT: u16 = 9051;
+const TC_PORT: u16 = 9051;
 
-fn main() -> Result<()> {
-    assert_can_connect_to_tor()?;
+#[tokio::main]
+async fn main() -> Result<()> {
+    let sock = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), TC_PORT);
+    let stream = TcpStream::connect(sock).await?;
 
-    Ok(())
-}
+    let mut conn = UnauthenticatedConn::new(stream);
+    let info = match conn.load_protocol_info().await {
+        Ok(info) => info,
+        Err(_) => bail!("failed to load protocol info from Tor")
+    };
 
-/// Asserts we can make a TCP connection to a local tor instance on TC_PORT.
-fn assert_can_connect_to_tor() -> Result<()> {
-    // TODO: Connect using tor_control
-    // TODO: Connect using tor-client
-    // TODO: Connect using torut
+    let auth_data = info.make_auth_data()?.expect("failed to make auth data");
+    if conn.authenticate(&auth_data).await.is_err() {
+        bail!("failed to authenticate with Tor")
+    }
 
-    let mut _stream = TcpStream::connect("127.0.0.1:9051")?;
+    let _conn: AuthenticatedConn<TcpStream, ()> = conn.into_authenticated().await;
 
     Ok(())
 }

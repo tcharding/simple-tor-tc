@@ -6,3 +6,5 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0"
+tokio = { version = "0.2", features = ["rt-threaded", "time", "macros", "sync", "tcp"] }
+torut = "0.1"
