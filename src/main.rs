@@ -1,5 +1,7 @@
+use std::net::{IpAddr, Ipv4Addr,  SocketAddr};
 use anyhow::{bail, Result};
 use torut::control::{UnauthenticatedConn};
+use torut::onion::{TorSecretKeyV3};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -23,6 +25,29 @@ async fn main() -> Result<()> {
     }));
 
     ac.take_ownership().await.unwrap();
+
+    // Start a web server (Hello World: https://github.com/tcharding/rust-web-hello-world)
+
+    //
+    // Add an onion service that re-directs to local web server instance
+    //
+
+    let key = TorSecretKeyV3::generate();
+    ac.add_onion_v3(&key, false, false, false, None, &mut [
+                (8000, SocketAddr::new(IpAddr::from(Ipv4Addr::new(127,0,0,1)), 8000)),
+            ].iter()).await.unwrap();
+
+    let onion_addr = key.public().get_onion_address();
+    println!("onion service available on: {}:8000", onion_addr);
+
+    //
+    // Now do a GET request to the web server via the Tor network.
+    //
+
+    // curl -x socks5h://127.0.0.1:9050 http://modvw2tdzvbfzm7bffo5ykkzgmk2lirtsiefcbvfcl2d2jx3soplbryd.onion:8000
+    // Hello world!
+
+    ::std::thread::park();
 
     Ok(())
 }
