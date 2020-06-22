@@ -1,3 +1,5 @@
+use std::io::prelude::*;
+use tor_stream::TorStream;
 use std::net::{IpAddr, Ipv4Addr,  SocketAddr};
 use anyhow::{bail, Result};
 use torut::control::{UnauthenticatedConn};
@@ -34,18 +36,37 @@ async fn main() -> Result<()> {
 
     let key = TorSecretKeyV3::generate();
     ac.add_onion_v3(&key, false, false, false, None, &mut [
-                (8000, SocketAddr::new(IpAddr::from(Ipv4Addr::new(127,0,0,1)), 8000)),
+                (8007, SocketAddr::new(IpAddr::from(Ipv4Addr::new(127,0,0,1)), 8007)),
             ].iter()).await.unwrap();
 
     let onion_addr = key.public().get_onion_address();
-    println!("onion service available on: {}:8000", onion_addr);
+    let onion = format!("{}:8007", onion_addr);
+    println!("onion service available on: {}", onion);
 
     //
     // Now do a GET request to the web server via the Tor network.
     //
 
-    // curl -x socks5h://127.0.0.1:9050 http://modvw2tdzvbfzm7bffo5ykkzgmk2lirtsiefcbvfcl2d2jx3soplbryd.onion:8000
+    // curl proxifies the HTTP request so that the Tor socks proxy correctly routes it.
+    //
+    // $ curl -x socks5h://127.0.0.1:9050 http://modvw2tdzvbfzm7bffo5ykkzgmk2lirtsiefcbvfcl2d2jx3soplbryd.onion:8000
     // Hello world!
+
+    let mut stream = TorStream::connect(onion.as_str()).expect("Failed to connect");
+    println!("TorStream connection established");
+
+    // The stream can be used like a normal TCP stream
+
+    println!("writing 'ping' to the stream");
+    stream.write_all(b"ping\n").expect("Failed to send request");
+
+    // If you want the raw stream, call `unwrap`
+    let mut stream = stream.unwrap();
+
+    println!("reading from the stream ...");
+    let mut buf = [0u8; 128];
+    let n = stream.read(&mut buf)?;
+    println!("{}", std::str::from_utf8(&buf[0..n]).unwrap());
 
     ::std::thread::park();
 

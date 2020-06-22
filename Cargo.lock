@@ -609,6 +609,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "tokio",
+ "tor-stream",
  "torut",
 ]
 
@@ -617,6 +618,18 @@ name = "slab"
 version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c111b5bd5695e56cffe5129854aa230b39c93a305372fdbb2668ca2394eea9f8"
+
+[[package]]
+name = "socks"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e6a64cfa9346d26e836a49fcc1ddfcb4d3df666b6787b6864db61d4918e1cbc2"
+dependencies = [
+ "byteorder",
+ "libc",
+ "winapi 0.2.8",
+ "ws2_32-sys",
+]
 
 [[package]]
 name = "subtle"
@@ -688,6 +701,16 @@ dependencies = [
  "proc-macro2 1.0.18",
  "quote 1.0.7",
  "syn 1.0.31",
+]
+
+[[package]]
+name = "tor-stream"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5865109fc90e0bc0f8c299f3794ca0fd5771df988aa6b962d4c9129c39674746"
+dependencies = [
+ "lazy_static",
+ "socks",
 ]
 
 [[package]]
