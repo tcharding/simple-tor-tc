@@ -1,7 +1,6 @@
 mod echo;
 
 use torut::utils::{run_tor, AutoKillChild};
-use std::thread;
 use std::io::prelude::*;
 use tor_stream::TorStream;
 use std::net::{IpAddr, Ipv4Addr,  SocketAddr};
@@ -28,9 +27,9 @@ async fn main() -> Result<()> {
     //
     // Start an echo server
     //
-    let echo_server = thread::spawn(move || {
+    tokio::spawn(async move  {
         let addr = socket_addr();
-        echo::run(addr).expect("failed to start echo server")
+        echo::run(addr).await.expect("failed to start echo server")
     });
 
     //
@@ -87,8 +86,6 @@ async fn main() -> Result<()> {
     let mut buf = [0u8; 128];
     let n = stream.read(&mut buf)?;
     println!("received {} bytes: {}", n, std::str::from_utf8(&buf[0..n]).unwrap());
-
-    echo_server.join().expect("The echo server thread has panicked");
 
     Ok(())
 }

@@ -3,59 +3,47 @@
 //! Reads 'ping' message off the wire on localhost:8007
 //! Writes 'pong' massage in reply i.e., this is a limited echo server
 //!
-use std::io::Read;
-use std::io::Write;
 use std::net::SocketAddr;
-use std::net::{TcpListener, TcpStream};
-use std::thread;
-
+use tokio::net::{TcpListener, TcpStream};
+use tokio::prelude::*;
 use anyhow::Result;
 
 /// Entry point for the echo server.
-pub fn run(addr: SocketAddr) -> Result<()> {
-    let listener = TcpListener::bind(addr)?;
+pub async fn run(addr: SocketAddr) -> Result<()> {
+    let mut listener = TcpListener::bind(addr).await?;
     println!("echo: listening on: {}", addr);
 
-    for stream in listener.incoming() {
-        match stream {
-            Ok(stream) => {
-                thread::spawn(move || {
-                    handle_client(stream);
-                });
-            }
-            Err(_) => {
-                println!("Error");
-            }
-        }
+    loop {
+        let (socket, _) = listener.accept().await?;
+        handle_client(socket).await?;
     }
-
-    Ok(())
 }
 
-fn handle_client(mut stream: TcpStream) {
+async fn handle_client(mut stream: TcpStream) -> Result<()> {
     loop {
         let mut buf = [0; 1028];
-        match stream.read(&mut buf) {
+        match stream.read(&mut buf).await {
             Ok(bytes) => {
                 if bytes == 0 {
-                    break; // Connection was closed.
+                    return Ok(()); // Connection was closed.
                 }
 
                 let read = match std::str::from_utf8(&buf) {
                     Err(_) => {
                         eprintln!("echo: received {} bytes: invalid UTF-8", bytes);
                         continue;
-                    }
+                    },
                     Ok(s) => s,
                 };
-                if read.contains("ping") {
-                    let res = stream.write(b"pong");
-                    if res.is_err() {
-                        eprintln!("echo: failed to write back to stream")
-                    }
+
+                let res = if read.contains("ping") {
+                    stream.write(b"pong").await
                 } else {
-                    eprintln!("echo: received {} bytes: {}", bytes, read);
-                    let _written = stream.write(&buf[0..bytes]).unwrap();
+                    stream.write(&buf[0..bytes]).await
+                };
+
+                if res.is_err() {
+                    eprintln!("echo: failed to write back to stream")
                 }
             }
             Err(err) => {
