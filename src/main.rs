@@ -1,15 +1,10 @@
-use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use anyhow::{bail, Result};
 use tokio::net::TcpStream;
 use torut::control::{UnauthenticatedConn, AuthenticatedConn};
 
-const TC_PORT: u16 = 9051;
-
 #[tokio::main]
 async fn main() -> Result<()> {
-    let sock = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), TC_PORT);
-    let stream = TcpStream::connect(sock).await?;
-
+    let stream = simple_tor_tc::connect().await?;
     let mut conn = UnauthenticatedConn::new(stream);
     let info = match conn.load_protocol_info().await {
         Ok(info) => info,
