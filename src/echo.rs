@@ -34,19 +34,29 @@ pub fn run(addr: SocketAddr) -> Result<()> {
 
 fn handle_client(mut stream: TcpStream) {
     loop {
-        let mut read = [0; 1028];
-        match stream.read(&mut read) {
-            Ok(n) => {
-                if n == 0 {
-                    // connection was closed
-                    break;
+        let mut buf = [0; 1028];
+        match stream.read(&mut buf) {
+            Ok(bytes) => {
+                if bytes == 0 {
+                    break; // Connection was closed.
                 }
-                eprintln!(
-                    "echo: received {} bytes: {}",
-                    n,
-                    std::str::from_utf8(&read).unwrap()
-                );
-                let _written = stream.write(&read[0..n]).unwrap();
+
+                let read = match std::str::from_utf8(&buf) {
+                    Err(_) => {
+                        eprintln!("echo: received {} bytes: invalid UTF-8", bytes);
+                        continue;
+                    }
+                    Ok(s) => s,
+                };
+                if read.contains("ping") {
+                    let res = stream.write(b"pong");
+                    if res.is_err() {
+                        eprintln!("echo: failed to write back to stream")
+                    }
+                } else {
+                    eprintln!("echo: received {} bytes: {}", bytes, read);
+                    let _written = stream.write(&buf[0..bytes]).unwrap();
+                }
             }
             Err(err) => {
                 panic!(err);

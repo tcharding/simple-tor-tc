@@ -1,3 +1,7 @@
+mod echo;
+
+use torut::utils::{run_tor, AutoKillChild};
+use std::thread;
 use std::io::prelude::*;
 use tor_stream::TorStream;
 use std::net::{IpAddr, Ipv4Addr,  SocketAddr};
@@ -5,8 +9,34 @@ use anyhow::{bail, Result};
 use torut::control::{UnauthenticatedConn};
 use torut::onion::{TorSecretKeyV3};
 
+const PORT: u16 = 8007;
+
 #[tokio::main]
 async fn main() -> Result<()> {
+    //
+    // Start Tor
+    // /usr/bin/tor --defaults-torrc /usr/share/tor/tor-service-defaults-torrc -f /etc/tor/torrc
+    //
+    let child = run_tor("/usr/bin/tor", &mut [
+        "--CookieAuthentication", "1",
+        "--defaults-torrc", "/usr/share/tor/tor-service-defaults-torrc",
+        "-f", "/etc/tor/torrc",
+    ].iter()).expect("Starting tor filed");
+    let _child = AutoKillChild::new(child);
+    println!("Tor instance started");
+
+    //
+    // Start an echo server
+    //
+    let echo_server = thread::spawn(move || {
+        let addr = socket_addr();
+        echo::run(addr).expect("failed to start echo server")
+    });
+
+    //
+    // Get an authenticated connection to the Tor via the Tor Controller protocol.
+    //
+
     let stream = simple_tor_tc::connect().await?;
 
     let mut utc = UnauthenticatedConn::new(stream);
@@ -28,47 +58,41 @@ async fn main() -> Result<()> {
 
     ac.take_ownership().await.unwrap();
 
-    // Start a web server (Hello World: https://github.com/tcharding/rust-web-hello-world)
-
     //
-    // Add an onion service that re-directs to local web server instance
+    // Expose an onion service that re-directs to the echo server.
     //
 
     let key = TorSecretKeyV3::generate();
     ac.add_onion_v3(&key, false, false, false, None, &mut [
-                (8007, SocketAddr::new(IpAddr::from(Ipv4Addr::new(127,0,0,1)), 8007)),
+                (PORT, SocketAddr::new(IpAddr::from(Ipv4Addr::new(127,0,0,1)), PORT)),
             ].iter()).await.unwrap();
 
     let onion_addr = key.public().get_onion_address();
-    let onion = format!("{}:8007", onion_addr);
-    println!("onion service available on: {}", onion);
+    let onion = format!("{}:{}", onion_addr, PORT);
+    println!("onion service: {}", onion);
 
     //
-    // Now do a GET request to the web server via the Tor network.
+    // Connect to the echo server via the Tor network.
     //
-
-    // curl proxifies the HTTP request so that the Tor socks proxy correctly routes it.
-    //
-    // $ curl -x socks5h://127.0.0.1:9050 http://modvw2tdzvbfzm7bffo5ykkzgmk2lirtsiefcbvfcl2d2jx3soplbryd.onion:8000
-    // Hello world!
 
     let mut stream = TorStream::connect(onion.as_str()).expect("Failed to connect");
     println!("TorStream connection established");
 
-    // The stream can be used like a normal TCP stream
-
     println!("writing 'ping' to the stream");
     stream.write_all(b"ping\n").expect("Failed to send request");
 
-    // If you want the raw stream, call `unwrap`
     let mut stream = stream.unwrap();
 
     println!("reading from the stream ...");
     let mut buf = [0u8; 128];
     let n = stream.read(&mut buf)?;
-    println!("{}", std::str::from_utf8(&buf[0..n]).unwrap());
+    println!("received {} bytes: {}", n, std::str::from_utf8(&buf[0..n]).unwrap());
 
-    ::std::thread::park();
+    echo_server.join().expect("The echo server thread has panicked");
 
     Ok(())
+}
+
+fn socket_addr() -> SocketAddr {
+    SocketAddr::new(IpAddr::from(Ipv4Addr::new(127,0,0,1)), PORT)
 }
