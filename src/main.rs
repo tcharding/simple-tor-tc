@@ -1,20 +1,31 @@
 mod echo;
 
-use torut::utils::{run_tor, AutoKillChild};
-use std::io::prelude::*;
-use tor_stream::TorStream;
-use std::net::{IpAddr, Ipv4Addr,  SocketAddr};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
 use anyhow::{bail, Result};
 use torut::control::{UnauthenticatedConn};
 use torut::onion::{TorSecretKeyV3};
+use torut::utils::{run_tor, AutoKillChild};
+use tokio::prelude::*;
+
+#[macro_use]
+extern crate lazy_static;
+
+lazy_static! {
+    /// Default address to use for the echo server.
+    pub static ref ECHO_ADDR: SocketAddr = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 8007));
+    /// The default TOR socks5 proxy address, `127.0.0.1:9050`.
+    pub static ref TOR_PROXY_ADDR: SocketAddr = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 9050));
+    /// The default TOR Controller Protocol address, `127.0.0.1:9051`.
+    pub static ref TOR_CP_ADDR: SocketAddr = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::LOCALHOST, 9051));
+}
 
 const PORT: u16 = 8007;
 
+
 #[tokio::main]
 async fn main() -> Result<()> {
-    //
     // Start Tor
-    // /usr/bin/tor --defaults-torrc /usr/share/tor/tor-service-defaults-torrc -f /etc/tor/torrc
+    //   /usr/bin/tor --defaults-torrc /usr/share/tor/tor-service-defaults-torrc -f /etc/tor/torrc
     //
     let child = run_tor("/usr/bin/tor", &mut [
         "--CookieAuthentication", "1",
@@ -28,15 +39,14 @@ async fn main() -> Result<()> {
     // Start an echo server
     //
     tokio::spawn(async move  {
-        let addr = socket_addr();
-        echo::run(addr).await.expect("failed to start echo server")
+        echo::run(*ECHO_ADDR).await.expect("failed to start echo server")
     });
 
     //
     // Get an authenticated connection to the Tor via the Tor Controller protocol.
     //
 
-    let stream = simple_tor_tc::connect().await?;
+    let stream = simple_tor_tc::connect_tor_cp(*TOR_CP_ADDR).await?;
 
     let mut utc = UnauthenticatedConn::new(stream);
 
@@ -74,22 +84,16 @@ async fn main() -> Result<()> {
     // Connect to the echo server via the Tor network.
     //
 
-    let mut stream = TorStream::connect(onion.as_str()).expect("Failed to connect");
+    let mut stream = simple_tor_tc::connect_tor_socks_proxy(*TOR_PROXY_ADDR, onion.as_str()).await?;
     println!("TorStream connection established");
 
     println!("writing 'ping' to the stream");
-    stream.write_all(b"ping\n").expect("Failed to send request");
-
-    let mut stream = stream.unwrap();
+    stream.write_all(b"ping\n").await?;
 
     println!("reading from the stream ...");
     let mut buf = [0u8; 128];
-    let n = stream.read(&mut buf)?;
+    let n = stream.read(&mut buf).await?;
     println!("received {} bytes: {}", n, std::str::from_utf8(&buf[0..n]).unwrap());
 
     Ok(())
-}
-
-fn socket_addr() -> SocketAddr {
-    SocketAddr::new(IpAddr::from(Ipv4Addr::new(127,0,0,1)), PORT)
 }

@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "1.0"
-tokio = { version = "0.2", features = ["rt-threaded", "time", "macros", "sync", "tcp"] }
+lazy_static = "1.2.0"
+tokio = { version = "0.2", features = ["tcp", "io-util", "macros", "rt-core"] }
+tokio-socks = "0.2"
 torut = "0.1"
-tor-stream = "0.2"
